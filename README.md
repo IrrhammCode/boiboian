@@ -46,3 +46,19 @@ Deploy the `dist/` folder (GitHub Pages, etc.). Paths are relative (`base: './'`
 ## Style
 
 See `style-lock.md` — **Knockout Court**: teal vs mango vinyl athletes, dusk dual-temp lighting, ceramic pyramid, gloss rubber ball.
+
+## Deploy (GitHub Pages)
+
+1. Open the repo → **Settings → Pages → Build and deployment → Source: GitHub Actions**
+2. Push to `main` (workflow: `.github/workflows/deploy-pages.yml`)
+3. Play at `https://irrhammcode.github.io/boiboian/`
+
+## Jam gate
+
+```bash
+npm run build && npm run preview -- --host 127.0.0.1 --port 4173
+# from 404-game-recipe:
+node harness/jam.mjs http://127.0.0.1:4173/ --start="#startb" --hold="#stick"
+```
+
+Local gate: **PASS** (ready, start tap, moved ≥1 m, draws/tris under budget).
