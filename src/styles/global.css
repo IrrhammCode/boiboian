@@ -191,6 +191,14 @@ button {
   font-weight: 700;
   letter-spacing: 0.02em;
 }
+.duty-row {
+  top: calc(max(12px, env(safe-area-inset-top)) + 48px) !important;
+}
+.pause-btn {
+  cursor: pointer;
+  min-width: 40px;
+  justify-content: center;
+}
 .flash {
   position: absolute;
   inset: 0;

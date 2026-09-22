@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { createRig } from '../lib/rig.js';
 import { ASSET_FACTORY, bakeStatic } from '../lib/assetlib.js';
 import { sfx, unlockAudio } from '../lib/sfx.js';
+import { createJuice } from './juice.js';
 
 import courtFactory from '../assets/court_ground.js';
 import ballFactory from '../assets/ball_playground.js';
@@ -47,8 +48,9 @@ export class BoiGame {
     this.playerSide = 'teal'; // teal rebuild first after knock flip — player picks role
     this.score = { teal: 0, mango: 0 };
     this.round = 0;
-    this.knockTeam = 'mango';
+    this.knockTeam = 'teal';
     this.rebuildTeam = 'teal';
+    this.tagTeam = 'mango';
     this.knockLeft = 3;
     this.timer = ROUND_T;
     this.holdT = 0;
@@ -84,6 +86,9 @@ export class BoiGame {
     this.player = null;
     this.traj = null;
     this.world = null;
+    this.juice = null;
+    this._trailAcc = 0;
+    this.coached = { pass: false, rebuild: false };
   }
 
   async init() {
@@ -100,6 +105,7 @@ export class BoiGame {
 
     this.world = new THREE.Group();
     this.scene.add(this.world);
+    this.juice = createJuice(this.world);
 
     const court = await ASSET_FACTORY(courtFactory, { cacheKey: 'court', surfaces: true });
     this.world.add(court);
@@ -184,6 +190,16 @@ export class BoiGame {
       this.trajDots.push(d);
     }
 
+    const ring = new THREE.Mesh(
+      new THREE.RingGeometry(REBUILD_R - 0.04, REBUILD_R, 48),
+      new THREE.MeshBasicMaterial({ color: 0x5ef0d8, transparent: true, opacity: 0.18, side: THREE.DoubleSide }),
+    );
+    ring.rotation.x = -Math.PI / 2;
+    ring.position.y = 0.07;
+    ring.visible = false;
+    this.world.add(ring);
+    this.zoneRing = ring;
+
     this._bindInput();
     this._emitHud();
     window.__READY__ = true;
@@ -208,6 +224,7 @@ export class BoiGame {
       holding: false, carrying: null, placeSlot: -1,
       aiT: 0, animT: Math.random() * 10,
       speed: 4.2,
+      celebrate: 0,
     };
   }
 
@@ -308,8 +325,10 @@ export class BoiGame {
 
   _scatter(pity = false) {
     sfx.pyramid_collapse();
-    this.freezeT = 0.12;
-    this.shakeT = 0.25;
+    this.freezeT = 0.14;
+    this.shakeT = 0.28;
+    this.juice?.dustAt(0, 0.2, 0, 14);
+    this.juice?.sparksAt(0, 0.35, 0, 12);
     this.placed = 0;
     for (let i = 0; i < this.shards.length; i++) {
       const s = this.shards[i];
@@ -329,6 +348,7 @@ export class BoiGame {
     this.tagTeam = this.knockTeam === 'teal' ? 'mango' : 'teal';
     this.phase = 'live';
     this.timer = ROUND_T;
+    if (this.zoneRing) this.zoneRing.visible = true;
     this.toast = this.playerSide === this.rebuildTeam
       ? (this.lang === 'id' ? 'Susun di bawah tembakan!' : 'Rebuild under fire!')
       : (this.lang === 'id' ? 'Oper — jangan lari bawa bola!' : 'Pass — don’t run with the ball!');
@@ -399,6 +419,7 @@ export class BoiGame {
   tapAction() { this.input.action = true; }
   tapSwap() { this.input.swap = true; }
   tapBoi() { this.input.boi = true; }
+  setPaused(v) { this.paused = !!v; this._emitHud(); }
 
   _resize() {
     const w = this.canvas.clientWidth;
@@ -427,6 +448,7 @@ export class BoiGame {
 
   _update(dt) {
     if (this.toastT > 0) this.toastT -= dt;
+    this.juice?.update(dt);
     if (this.freezeT > 0) { this.freezeT -= dt; return; }
     if (this.shakeT > 0) this.shakeT -= dt;
 
@@ -453,7 +475,7 @@ export class BoiGame {
     }
 
     if (this.phase === 'knock' || this.phase === 'live') {
-      this._readKeys();
+      this._readKeys(dt);
       this._updatePlayer(dt);
       this._updateAI(dt);
       this._updateBall(dt);
@@ -489,7 +511,7 @@ export class BoiGame {
     }
   }
 
-  _readKeys() {
+  _readKeys(dt = 0.016) {
     let x = 0; let z = 0;
     if (this.keys.has('a') || this.keys.has('arrowleft')) x -= 1;
     if (this.keys.has('d') || this.keys.has('arrowright')) x += 1;
@@ -499,11 +521,11 @@ export class BoiGame {
     else if (x || z) this.setMove(x, z);
 
     if (this.keys.has(' ')) { /* boi edged via keydown */ }
-    if (this.input.charge) this.input.chargeT = Math.min(0.7, this.input.chargeT + 0.016);
-    else if (this.input.chargeT > 0.05) {
+    if (this.input.charge && this.player?.holding) this.input.chargeT = Math.min(0.7, this.input.chargeT + dt);
+    else if (this.input.chargeT > 0.08 && this.player?.holding) {
       this._throw(this.input.chargeT);
       this.input.chargeT = 0;
-    } else this.input.chargeT = 0;
+    } else if (!this.input.charge) this.input.chargeT = 0;
 
     if (this.input.pass) { this._pass(); this.input.pass = false; }
     if (this.input.action) { this._action(); this.input.action = false; }
@@ -568,6 +590,8 @@ export class BoiGame {
   _throw(charge) {
     const p = this.player;
     if (!p?.holding) return;
+    if (this.phase === 'knock' && p.team !== this.knockTeam) return;
+    if (this.phase === 'live' && p.team !== this.tagTeam) return;
     let aimx = this.input.aimx;
     let aimz = this.input.aimz;
     // soft aim assist
@@ -705,6 +729,7 @@ export class BoiGame {
     this.placeT = 0;
     this.placed += 1;
     sfx.shard_place();
+    this.juice?.sparksAt(g.x, g.y + 0.1, g.z, 6);
     if (this.placed >= 10) {
       this.toast = this.lang === 'id' ? 'Hampir Boi!' : 'Almost Boi!';
       this.toastT = 1.5;
@@ -749,6 +774,8 @@ export class BoiGame {
       if (b.state !== 'free') {
         b.vel.y -= 18 * dt;
         b.pos.addScaledVector(b.vel, dt);
+        this._trailAcc = (this._trailAcc || 0) + dt;
+        if (this._trailAcc > 0.04) { this._trailAcc = 0; this.juice?.trailAt(b.pos.x, b.pos.y, b.pos.z); }
         if (b.pos.y < 0.09) {
           b.pos.y = 0.09;
           b.vel.y *= -0.4;
@@ -838,6 +865,7 @@ export class BoiGame {
     if (a.holding) this._dropBall();
     this.shakeT = 0.15;
     this.freezeT = 0.08;
+    this.juice?.sparksAt(a.pos.x, 1, a.pos.z, 10);
     sfx.tag_hit();
     sfx.kid_out();
     if (this.player === a) this._swap();
@@ -986,6 +1014,7 @@ export class BoiGame {
   _syncAthletes(dt) {
     for (const a of this.athletes) {
       a.animT += dt;
+      if (a.celebrate > 0) a.celebrate -= dt;
       a.mesh.position.x = a.pos.x;
       a.mesh.position.z = a.pos.z;
       a.mesh.position.y = a.out ? 0 : 0;
@@ -1000,11 +1029,16 @@ export class BoiGame {
       if (j.rightUpperLeg) j.rightUpperLeg.rotation.x = -swing;
       if (j.leftUpperArm) j.leftUpperArm.rotation.x = -swing * 0.8;
       if (j.rightUpperArm) j.rightUpperArm.rotation.x = swing * 0.8;
-      if (a.out) {
+      if (a.celebrate > 0 && j.leftUpperArm) {
+        j.leftUpperArm.rotation.x = -2.2;
+        j.rightUpperArm.rotation.x = -2.2;
+        a.mesh.position.y = Math.abs(Math.sin(a.animT * 12)) * 0.25;
+      } else if (a.out) {
         a.mesh.rotation.x = -1.1;
         a.mesh.position.y = 0.15;
       } else {
         a.mesh.rotation.x = 0;
+        a.mesh.position.y = 0;
       }
       if (a.carrying != null) {
         const s = this.shards[a.carrying];
@@ -1041,11 +1075,14 @@ export class BoiGame {
   }
 
   _endRound(kind) {
+    if (this.phase === 'resolve' || this.phase === 'matchover') return;
     this.phase = 'resolve';
     this._resolveAcc = 0;
     if (kind === 'boi') {
       this.score[this.rebuildTeam] += 1;
       this.freezeT = 0.55;
+      for (const a of this.athletes) { if (a.team === this.rebuildTeam && a.alive) a.celebrate = 1.2; }
+      if (this.zoneRing) this.zoneRing.visible = false;
       sfx.boi();
       this.toast = 'BOI!';
       this.toastT = 2;
@@ -1092,6 +1129,7 @@ export class BoiGame {
       holdWarn: this.holdT > HOLD_MAX * 0.7,
       chain: this.passChain,
       lang: this.lang,
+      paused: this.paused,
     });
   }
 

@@ -8,7 +8,7 @@ const COPY = {
   en: {
     tagline: 'Neo-street court sports. Knock the stack. Pass — don’t run. Rebuild under fire. Shout Boi.',
     playTeal: 'Play Rebuild',
-    playTealSub: 'Teal · stack under fire',
+    playTealSub: 'Teal · knock, then stack under fire',
     playMango: 'Play Tag',
     playMangoSub: 'Mango · pass & hunt',
     how: 'How it works',
@@ -23,14 +23,14 @@ const COPY = {
   id: {
     tagline: 'Olahraga lapangan neo-street. Robohkan susunan. Oper — jangan lari. Susun di bawah tembakan. Teriak Boi.',
     playTeal: 'Main Susun',
-    playTealSub: 'Teal · susun di bawah tembakan',
+    playTealSub: 'Teal · robohkan, lalu susun',
     playMango: 'Main Tag',
     playMangoSub: 'Mango · oper & buru',
     how: 'Cara main',
     howClose: 'Mengerti',
     rules: [
       'Robohkan susunan keramik dari garis lempar.',
-      'Yang merobohkan wajib menyusun. Lawan menag dengan bola.',
+      'Yang merobohkan wajib menyusun. Lawan menandai dengan bola.',
       'Pegang bola? Tidak boleh lari — oper.',
       'Selesai susun, teriak Boi. First to 2 menang.',
     ],
@@ -46,6 +46,7 @@ export default function App() {
   const [hud, setHud] = useState(null);
   const [flash, setFlash] = useState(false);
   const [result, setResult] = useState(null);
+  const [paused, setPaused] = useState(false);
   const copy = COPY[lang];
 
   useEffect(() => {
@@ -54,7 +55,10 @@ export default function App() {
     const game = new BoiGame(canvas, {
       onReady: () => setReady(true),
       onStart: () => setScreen('play'),
-      onHud: (h) => setHud(h),
+      onHud: (h) => {
+        setHud(h);
+        setPaused(!!h.paused);
+      },
       onFlash: (t) => {
         setFlash(true);
         setTimeout(() => setFlash(false), (t || 0.5) * 1000);
@@ -76,7 +80,16 @@ export default function App() {
   const start = useCallback((side) => {
     setScreen('play');
     setResult(null);
+    setPaused(false);
     gameRef.current?.startMatch(side);
+  }, []);
+
+  const togglePause = useCallback(() => {
+    setPaused((prev) => {
+      const next = !prev;
+      gameRef.current?.setPaused(next);
+      return next;
+    });
   }, []);
 
   const onMove = useCallback((x, z) => gameRef.current?.setMove(x, z), []);
@@ -132,8 +145,10 @@ export default function App() {
           </div>
         )}
 
-        {screen === 'play' && hud && <Hud hud={hud} lang={lang} />}
-        {screen === 'play' && (
+        {screen === 'play' && hud && (
+          <Hud hud={{ ...hud, paused }} lang={lang} onPause={togglePause} />
+        )}
+        {screen === 'play' && !paused && (
           <TouchControls
             onMove={onMove}
             onCharge={onCharge}

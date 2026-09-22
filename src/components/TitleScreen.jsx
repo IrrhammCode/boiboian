@@ -9,8 +9,14 @@ export function TitleScreen({ copy, ready, lang, onLang, onPlayTeal, onPlayMango
         <p>{copy.tagline}</p>
       </div>
       <div className="actions">
-        <button type="button" className="btn primary" disabled={!ready} onClick={onPlayTeal}>
-          <span>{copy.playTeal}</span>
+        <button
+          type="button"
+          id="startb"
+          className="btn primary"
+          disabled={!ready}
+          onClick={onPlayTeal}
+        >
+          <span>{ready ? copy.playTeal : (lang === 'id' ? 'Memuat…' : 'Loading…')}</span>
           <small>{copy.playTealSub}</small>
         </button>
         <button type="button" className="btn mango" disabled={!ready} onClick={onPlayMango}>

@@ -1,11 +1,11 @@
-export function Hud({ hud, lang }) {
+export function Hud({ hud, lang, onPause }) {
   const dutyMap = {
-    knock: lang === 'id' ? 'Knock' : 'Knock',
+    knock: 'Knock',
     rebuild: lang === 'id' ? 'Susun' : 'Rebuild',
-    tag: lang === 'id' ? 'Tag' : 'Tag',
+    tag: 'Tag',
     countdown: '…',
     resolve: '…',
-    live: lang === 'id' ? 'Live' : 'Live',
+    live: 'Live',
   };
   return (
     <div className="hud">
@@ -18,9 +18,12 @@ export function Hud({ hud, lang }) {
           {hud.phase === 'live' ? ` · ${hud.placed}/12` : ''}
         </div>
         <div className="pill mango"><span className="dot" />{hud.score.mango}</div>
+        <button type="button" className="pill pause-btn" onClick={onPause} style={{ pointerEvents: 'auto' }}>
+          {hud.paused ? '▶' : 'Ⅱ'}
+        </button>
       </div>
       {hud.duty && hud.duty !== 'countdown' && (
-        <div className="hud-top" style={{ top: 'auto', bottom: 'auto', marginTop: 52 }}>
+        <div className="hud-top duty-row">
           <div className={`pill ${hud.duty === 'rebuild' ? 'teal' : 'mango'}`}>
             <span className="dot" />
             {dutyMap[hud.duty] || hud.duty}
@@ -30,6 +33,7 @@ export function Hud({ hud, lang }) {
         </div>
       )}
       {hud.toast ? <div className="toast">{hud.toast}</div> : null}
+      {hud.paused ? <div className="toast">{lang === 'id' ? 'Jeda' : 'Paused'}</div> : null}
     </div>
   );
 }

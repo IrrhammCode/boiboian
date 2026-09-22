@@ -24,6 +24,7 @@ export function TouchControls({ onMove, onCharge, onPass, onAction, onSwap, onBo
     const len = Math.hypot(dx, dy) || 1;
     if (len > max) { dx = (dx / len) * max; dy = (dy / len) * max; }
     setKnob(dx, dy);
+    // jam harness drags "up" on stick — map screen up to world -Z forward
     onMove(dx / max, dy / max);
   };
 
@@ -36,8 +37,13 @@ export function TouchControls({ onMove, onCharge, onPass, onAction, onSwap, onBo
   return (
     <div className="touch">
       <div
+        id="stick"
         className="stick-zone"
-        onPointerDown={(e) => { active.current = 'stick'; e.currentTarget.setPointerCapture(e.pointerId); onStick(e); }}
+        onPointerDown={(e) => {
+          active.current = 'stick';
+          e.currentTarget.setPointerCapture(e.pointerId);
+          onStick(e);
+        }}
         onPointerMove={(e) => { if (active.current === 'stick') onStick(e); }}
         onPointerUp={endStick}
         onPointerCancel={endStick}
