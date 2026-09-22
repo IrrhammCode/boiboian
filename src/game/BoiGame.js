@@ -223,7 +223,7 @@ export class BoiGame {
       yaw: team === 'teal' ? Math.PI : 0,
       holding: false, carrying: null, placeSlot: -1,
       aiT: 0, animT: Math.random() * 10,
-      speed: 4.2,
+      speed: 5.2,
       celebrate: 0,
     };
   }
@@ -469,6 +469,8 @@ export class BoiGame {
         }
         this._emitHud();
       }
+      this._readKeys(dt);
+      this._updatePlayer(dt);
       this._syncAthletes(dt);
       this._camera(dt);
       return;
@@ -512,6 +514,10 @@ export class BoiGame {
   }
 
   _readKeys(dt = 0.016) {
+    const stick = (typeof window !== 'undefined') ? window.__STICK__ : null;
+    if (stick && (stick.x || stick.z)) {
+      this.setMove(stick.x, stick.z);
+    }
     let x = 0; let z = 0;
     if (this.keys.has('a') || this.keys.has('arrowleft')) x -= 1;
     if (this.keys.has('d') || this.keys.has('arrowright')) x += 1;
